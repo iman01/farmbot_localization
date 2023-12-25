@@ -14,19 +14,7 @@
 #include "message_filters/sync_policies/approximate_time.h"
 
 std::array<double, 4> theta_to_quaternion(double theta) {
-    return {std::cos(theta/2), 0, 0, std::sin(theta/2)};
-}
-
-std::array<float, 4> theta_to_quaternion(float theta) {
-    return {std::cos(theta/2), 0, 0, std::sin(theta/2)};
-}
-
-double quaternion_to_theta(std::array<double, 4> q) {
-    return 2 * std::atan2(q[3], q[0]);
-}
-
-float quaternion_to_theta(std::array<float, 4> q) {
-    return 2 * std::atan2(q[3], q[0]);
+    return {std::cos(theta/2), 0, 0, -std::sin(theta/2)};
 }
 
 
@@ -35,6 +23,7 @@ class OdomNPath : public rclcpp::Node {
         nav_msgs::msg::Odometry enu_odom;
         nav_msgs::msg::Odometry odom_map;
         nav_msgs::msg::Path path;
+        bool reset_path = false;
         geometry_msgs::msg::PoseStamped prev_point_path;
         geometry_msgs::msg::PoseStamped prev_point_dist;
         farmbot_interfaces::msg::Float32Stamped cumulative_dist;
@@ -84,7 +73,8 @@ class OdomNPath : public rclcpp::Node {
         void callback(const nav_msgs::msg::Odometry::ConstSharedPtr& enu_msg, const farmbot_interfaces::msg::Float32Stamped::ConstSharedPtr& rad_msg, const nav_msgs::msg::Odometry::ConstSharedPtr& ecef_msg) {
             nav_msgs::msg::Odometry ecef_msg_ = *ecef_msg; // TODO: fix, this is a hack to get rid of unused variable warning
             enu_odom = *enu_msg;
-            std::array<float, 4> quaterions = theta_to_quaternion(rad_msg->data);
+            std::array<double, 4> quaterions = theta_to_quaternion(rad_msg->data);
+            RCLCPP_INFO(this->get_logger(), "quat: %.15f, %.15f, %.15f, %.15f", quaterions[0], quaterions[1], quaterions[2], quaterions[3]);
             enu_odom.pose.pose.orientation.w = quaterions[0];
             enu_odom.pose.pose.orientation.x = quaterions[1];
             enu_odom.pose.pose.orientation.y = quaterions[2];
@@ -97,6 +87,7 @@ class OdomNPath : public rclcpp::Node {
             pose.pose.position.z = 0; // TODO: remove if you want to use altitude
 
             //create path
+            path.header.frame_id = "map";
             if (prev_point_path.pose.position.x == 0) {
                 prev_point_path = pose;
             }
@@ -105,8 +96,7 @@ class OdomNPath : public rclcpp::Node {
                 prev_point_path = pose;
                 path.poses.push_back(pose);
             }
-            if (path.poses.size() > 100) {
-                path.header.frame_id = "map";
+            if (path.poses.size() > 100 && reset_path) {
                 path.poses.erase(path.poses.begin());
             }
 
