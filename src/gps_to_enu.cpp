@@ -58,9 +58,9 @@ class Gps2Enu : public rclcpp::Node {
         message_filters::Subscriber<sensor_msgs::msg::NavSatFix> ref_sub;
         std::shared_ptr<message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::NavSatFix, sensor_msgs::msg::NavSatFix>>> sync_;
 
-        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr encf_pub_;
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr ecef_pub_;
         rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr enu_pub_;
-        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr encf_datum_pub_;
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr ecef_datum_pub_;
 
     public:
         Gps2Enu() : Node(
@@ -80,9 +80,9 @@ class Gps2Enu : public rclcpp::Node {
             sync_->connectInput(fix_sub_, ref_sub);
             sync_->registerCallback(std::bind(&Gps2Enu::callback, this, std::placeholders::_1, std::placeholders::_2));
 
-            encf_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/encf", 10);
+            ecef_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/ecef", 10);
             enu_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/enu", 10);
-            encf_datum_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/ref/encf", 10);
+            ecef_datum_pub_ = this->create_publisher<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/ref/ecef", 10);
         }
 
     private:
@@ -91,29 +91,29 @@ class Gps2Enu : public rclcpp::Node {
                 set_ecef_datum(ref);
                 datum_set = true;
             } else {
-                datum.header.stamp = ref->header.stamp;
-                encf_datum_pub_->publish(datum);
+                datum.header = ref->header;
+                ecef_datum_pub_->publish(datum);
             }
 
             double lat = fix->latitude, lon = fix->longitude, alt = fix->altitude;
-            nav_msgs::msg::Odometry encf_msg;
-            encf_msg.header = fix->header;
-            double encf_x, encf_y, encf_z;
-            std::tie(encf_x, encf_y, encf_z) = gps_to_ecef(lat, lon, alt);
-            encf_msg.pose.pose.position.x = encf_x;
-            encf_msg.pose.pose.position.y = encf_y;
-            encf_msg.pose.pose.position.z = encf_z;
+            nav_msgs::msg::Odometry ecef_msg;
+            ecef_msg.header = fix->header;
+            double ecef_x, ecef_y, ecef_z;
+            std::tie(ecef_x, ecef_y, ecef_z) = gps_to_ecef(lat, lon, alt);
+            ecef_msg.pose.pose.position.x = ecef_x;
+            ecef_msg.pose.pose.position.y = ecef_y;
+            ecef_msg.pose.pose.position.z = ecef_z;
 
             nav_msgs::msg::Odometry enu_msg;
             enu_msg.header = fix->header;
             double d_lat = ref->latitude, d_lon = ref->longitude, d_alt = ref->altitude;
             double enu_x, enu_y, enu_z;
-            std::tie(enu_x, enu_y, enu_z) = ecef_to_enu(std::make_tuple(encf_x, encf_y, encf_z), std::make_tuple(d_lat, d_lon, d_alt));
+            std::tie(enu_x, enu_y, enu_z) = ecef_to_enu(std::make_tuple(ecef_x, ecef_y, ecef_z), std::make_tuple(d_lat, d_lon, d_alt));
             enu_msg.pose.pose.position.x = enu_x;
             enu_msg.pose.pose.position.y = enu_y;
             enu_msg.pose.pose.position.z = enu_z;
 
-            encf_pub_->publish(encf_msg);
+            ecef_pub_->publish(ecef_msg);
             enu_pub_->publish(enu_msg);
         }
 

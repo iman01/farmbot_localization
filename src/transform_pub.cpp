@@ -11,7 +11,7 @@ class TransformPub : public rclcpp::Node {
         nav_msgs::msg::Odometry ecef_msg;
         bool is_transformed = false;
         rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr encf_sub_;
+        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr ecef_sub_;
         rclcpp::TimerBase::SharedPtr transform_timer_;
 
         std::unique_ptr<tf2_ros::TransformBroadcaster> base_tf;
@@ -31,7 +31,7 @@ class TransformPub : public rclcpp::Node {
             rclcpp::Parameter topic_prefix_param = this->get_parameter("topic_prefix");
 
             odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/odom", 10, std::bind(&TransformPub::base_transform, this, std::placeholders::_1));
-            encf_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/ref/encf", 10, std::bind(&TransformPub::encf_callback, this, std::placeholders::_1));
+            ecef_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(topic_prefix_param.as_string() + "/loc/ref/ecef", 10, std::bind(&TransformPub::ecef_callback, this, std::placeholders::_1));
             transform_timer_ = this->create_wall_timer(std::chrono::milliseconds(10000), std::bind(&TransformPub::ecef_timer, this));
 
             base_tf = std::make_unique<tf2_ros::TransformBroadcaster>(this);
@@ -40,13 +40,13 @@ class TransformPub : public rclcpp::Node {
         }
 
     private:
-        void encf_callback(const nav_msgs::msg::Odometry::ConstSharedPtr& odom) {
+        void ecef_callback(const nav_msgs::msg::Odometry::ConstSharedPtr& odom) {
             ecef_msg = *odom;
             map_transform();
             odom_transform();
             is_transformed = true;
             RCLCPP_INFO(this->get_logger(), "TRANSFORMS SET");
-            encf_sub_.reset();
+            ecef_sub_.reset();
             RCLCPP_INFO(this->get_logger(), "SUBSCRIPTION CLOSED");
         }
 
