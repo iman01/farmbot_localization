@@ -12,61 +12,61 @@
 
 
 class KalmanFilter {
-public:
-    KalmanFilter(double process_noise = 0.01, double measurement_noise = 0.1)
-        : estimated_state{0.0, 0.0},
-          estimated_error{{1.0, 0.0}, {0.0, 1.0}},
-          process_noise(process_noise),
-          measurement_noise(measurement_noise) {}
+    public:
+        KalmanFilter(double process_noise = 0.01, double measurement_noise = 0.1)
+            : estimated_state{0.0, 0.0},
+            estimated_error{{1.0, 0.0}, {0.0, 1.0}},
+            process_noise(process_noise),
+            measurement_noise(measurement_noise) {}
 
-    std::vector<double> step(std::vector<double> measurement) {
-        // Prediction step
-        std::vector<double> predicted_state = estimated_state;
-        std::vector<std::vector<double>> predicted_error = estimated_error;
-        for (long unsigned int i = 0; i < predicted_error.size(); ++i) {
-            for (long unsigned int j = 0; j < predicted_error[i].size(); ++j) {
-                if (i == j) {
-                    predicted_error[i][j] += process_noise;
+        std::vector<double> step(std::vector<double> measurement) {
+            // Prediction step
+            std::vector<double> predicted_state = estimated_state;
+            std::vector<std::vector<double>> predicted_error = estimated_error;
+            for (long unsigned int i = 0; i < predicted_error.size(); ++i) {
+                for (long unsigned int j = 0; j < predicted_error[i].size(); ++j) {
+                    if (i == j) {
+                        predicted_error[i][j] += process_noise;
+                    }
                 }
             }
-        }
-        // Update step
-        std::vector<std::vector<double>> kalman_gain_num = predicted_error;
-        // Adding a small value to avoid division by near-zero values
-        double epsilon = 1e-8;
-        std::vector<std::vector<double>> kalman_gain_denom = predicted_error;
-        for (long unsigned int i = 0; i < kalman_gain_denom.size(); ++i) {
-            for (long unsigned int j = 0; j < kalman_gain_denom[i].size(); ++j) {
-                if (i == j) {
-                    kalman_gain_denom[i][j] += measurement_noise + epsilon;
-                } else {
-                    kalman_gain_denom[i][j] += epsilon;
+            // Update step
+            std::vector<std::vector<double>> kalman_gain_num = predicted_error;
+            // Adding a small value to avoid division by near-zero values
+            double epsilon = 1e-8;
+            std::vector<std::vector<double>> kalman_gain_denom = predicted_error;
+            for (long unsigned int i = 0; i < kalman_gain_denom.size(); ++i) {
+                for (long unsigned int j = 0; j < kalman_gain_denom[i].size(); ++j) {
+                    if (i == j) {
+                        kalman_gain_denom[i][j] += measurement_noise + epsilon;
+                    } else {
+                        kalman_gain_denom[i][j] += epsilon;
+                    }
                 }
             }
-        }
-        std::vector<std::vector<double>> kalman_gain = kalman_gain_num;
-        for (long unsigned int i = 0; i < kalman_gain.size(); ++i) {
-            for (long unsigned int j = 0; j < kalman_gain[i].size(); ++j) {
-                kalman_gain[i][j] /= kalman_gain_denom[i][j];
+            std::vector<std::vector<double>> kalman_gain = kalman_gain_num;
+            for (long unsigned int i = 0; i < kalman_gain.size(); ++i) {
+                for (long unsigned int j = 0; j < kalman_gain[i].size(); ++j) {
+                    kalman_gain[i][j] /= kalman_gain_denom[i][j];
+                }
             }
-        }
-        std::vector<double> innovation = {measurement[0] - predicted_state[0], measurement[1] - predicted_state[1]};
-        for (long unsigned int i = 0; i < estimated_state.size(); ++i) {
-            estimated_state[i] = predicted_state[i] + kalman_gain[i][0] * innovation[0] + kalman_gain[i][1] * innovation[1];
-        }
-        for (long unsigned int i = 0; i < estimated_error.size(); ++i) {
-            for (long unsigned int j = 0; j < estimated_error[i].size(); ++j) {
-                estimated_error[i][j] = (1 - kalman_gain[i][j]) * predicted_error[i][j];
+            std::vector<double> innovation = {measurement[0] - predicted_state[0], measurement[1] - predicted_state[1]};
+            for (long unsigned int i = 0; i < estimated_state.size(); ++i) {
+                estimated_state[i] = predicted_state[i] + kalman_gain[i][0] * innovation[0] + kalman_gain[i][1] * innovation[1];
             }
+            for (long unsigned int i = 0; i < estimated_error.size(); ++i) {
+                for (long unsigned int j = 0; j < estimated_error[i].size(); ++j) {
+                    estimated_error[i][j] = (1 - kalman_gain[i][j]) * predicted_error[i][j];
+                }
+            }
+            return estimated_state;
         }
-        return estimated_state;
-    }
 
-private:
-    std::vector<double> estimated_state;
-    std::vector<std::vector<double>> estimated_error;
-    double process_noise;
-    double measurement_noise;
+    private:
+        std::vector<double> estimated_state;
+        std::vector<std::vector<double>> estimated_error;
+        double process_noise;
+        double measurement_noise;
 };
 
 double distance(std::tuple<double, double> coord1, std::tuple<double, double> coord2) {
@@ -100,7 +100,8 @@ class AntennaSplit : public rclcpp::Node {
         float threshold = 0.2;
         double process_noise = 0.01;
         double measurement_noise = 0.1;
-        KalmanFilter kallman = KalmanFilter(process_noise, measurement_noise);
+        KalmanFilter front_filter = KalmanFilter(process_noise, measurement_noise);
+        KalmanFilter back_filter = KalmanFilter(process_noise, measurement_noise);
 
         int kallman_type;
         rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub_;
@@ -142,8 +143,17 @@ class AntennaSplit : public rclcpp::Node {
             sensor_msgs::msg::NavSatFix main_gps = *gps;
             step++;
             if (positions.size() < 2) {
-                positions.push_back(main_gps);
-                positions.push_back(main_gps);
+                if (positions.size() == 0) {
+                    positions.push_back(main_gps);
+                    return;
+                }
+                double dist = distance(main_gps, positions[0]);
+                if (dist > threshold) {
+                    positions.push_back(main_gps);
+                    RCLCPP_INFO(this->get_logger(), "VEHICLE HAS MOVED SUFFICIENTLY, SWITCHING TO SIMULATED DUAL ANTENNA MODE");
+                    return;
+                }
+                RCLCPP_INFO(this->get_logger(), "WAITING FOR THE VEHICLE TO MOVE TO INITIALIZE SIMULATED DUAL ANTENNA MODE");
                 return;
             }
 
@@ -159,12 +169,19 @@ class AntennaSplit : public rclcpp::Node {
                 gps_back_->publish(positions[0]);
             } else if (kallman_type == 1) {
                 std::vector<double> measurement = {main_gps.latitude, main_gps.longitude};
-                std::vector<double> estimated_state = kallman.step(measurement);
-                sensor_msgs::msg::NavSatFix filtered_gps;
-                filtered_gps.header.stamp = main_gps.header.stamp;
-                filtered_gps.latitude = estimated_state[0];
-                filtered_gps.longitude = estimated_state[1];
-                gps_front_->publish(filtered_gps);
+                std::vector<double> estimated_state = front_filter.step(measurement);
+                main_gps.latitude = estimated_state[0];
+                main_gps.longitude = estimated_state[1];
+                if (distance(main_gps, positions[0]) > threshold) {
+                    std::vector<double> measurement = {positions[1].latitude, positions[1].longitude};
+                    std::vector<double> estimated_state = back_filter.step(measurement);
+                    positions[1].latitude = estimated_state[0];
+                    positions[1].longitude = estimated_state[1];
+                    positions[0] = positions[1];
+                    positions[1] = main_gps;
+                }
+                positions[0].header.stamp = gps->header.stamp;
+                gps_front_->publish(main_gps);
                 gps_back_->publish(positions[0]);
             } 
         }

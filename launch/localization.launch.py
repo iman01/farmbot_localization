@@ -51,7 +51,7 @@ def generate_launch_description():
     )
 
     ld.add_action(antenna_split)
-    # ld.add_action(antenna_fuse)
+    ld.add_action(antenna_fuse)
     # ld.add_action(gps_to_enu)
     # ld.add_action(odom_n_path)
     # ld.add_action(transform_pub)
