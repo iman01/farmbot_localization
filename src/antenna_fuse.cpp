@@ -14,6 +14,32 @@ double toRadians(double degrees) {
     return degrees * M_PI / 180.0;
 }
 
+std::pair<float, float> calc_bearing(double lat1_in, double long1_in, double lat2_in, double long2_in) {
+    // Convert latitude and longitude to radians
+    double lat1 = toRadians(lat1_in);
+    double long1 = toRadians(long1_in);
+    double lat2 = toRadians(lat2_in);
+    double long2 = toRadians(long2_in);
+    // Calculate the bearing
+    double bearing_rad = atan2(
+        sin(long2 - long1) * cos(lat2),
+        cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(long2 - long1)
+    );
+    // Add 90 degrees to get the bearing from north
+    bearing_rad += M_PI / 2.0;
+    // Convert the bearing to degrees
+    double bearing_deg = bearing_rad * 180.0 / M_PI;
+    // Make sure the bearing is positive
+    bearing_deg = fmod((bearing_deg + 360.0), 360.0);
+    // Make sure bearing is between -2pi and 2pi
+    if (bearing_rad < 0) {
+        bearing_rad += 2 * M_PI;
+    } else if (bearing_rad > 2 * M_PI) {
+        bearing_rad -= 2 * M_PI;
+    }
+    return std::make_pair(static_cast<float>(bearing_deg), static_cast<float>(bearing_rad));
+}
+
 class AntennaFuse : public rclcpp::Node {
     private:
         sensor_msgs::msg::NavSatFix datum;
@@ -62,7 +88,29 @@ class AntennaFuse : public rclcpp::Node {
         }
 
     private:
+
         void callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gps_front_msg, const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gps_back_msg) {
+            curr_pose = *gps_front_msg;
+
+            farmbot_interfaces::msg::Float32Stamped deg_msg;
+            farmbot_interfaces::msg::Float32Stamped rad_msg;
+            deg_msg.header = gps_front_msg->header;
+            rad_msg.header = gps_front_msg->header;
+            auto [bearing_deg, bearing_rad] = calc_bearing(gps_front_msg->latitude, gps_front_msg->longitude, gps_back_msg->latitude, gps_back_msg->longitude);
+            deg_msg.data = bearing_deg;
+            rad_msg.data = bearing_rad;
+
+            gps_pub_->publish(curr_pose);
+            deg_->publish(deg_msg);
+            rad_->publish(rad_msg);
+
+            if (datum_set) { 
+                datum.header = gps_front_msg->header;
+                dat_pub_->publish(datum);
+            }
+        }
+
+        void callback2(const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gps_front_msg, const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gps_back_msg) {
             curr_pose = *gps_front_msg;
             gps_pub_->publish(curr_pose);
             if (!datum_set) { 
@@ -70,7 +118,6 @@ class AntennaFuse : public rclcpp::Node {
             }
             datum.header = gps_front_msg->header;
             dat_pub_->publish(datum);
-
             farmbot_interfaces::msg::Float32Stamped deg_msg;
             farmbot_interfaces::msg::Float32Stamped rad_msg;
             deg_msg.header.stamp = gps_front_msg->header.stamp;
@@ -81,32 +128,6 @@ class AntennaFuse : public rclcpp::Node {
             deg_->publish(deg_msg);
             rad_msg.data = bearing_rad;
             rad_->publish(rad_msg);
-        }
-
-        std::pair<float, float> calc_bearing(double lat1, double long1, double lat2, double long2) {
-            // Convert latitude and longitude to radians
-            lat1 = M_PI * lat1 / 180.0;
-            long1 = M_PI * long1 / 180.0;
-            lat2 = M_PI * lat2 / 180.0;
-            long2 = M_PI * long2 / 180.0;
-            // Calculate the bearing
-            double bearing_rad = atan2(
-                sin(long2 - long1) * cos(lat2),
-                cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(long2 - long1)
-            );
-            // Add 90 degrees to get the bearing from north
-            bearing_rad += M_PI / 2.0;
-            // Convert the bearing to degrees
-            double bearing_deg = bearing_rad * 180.0 / M_PI;
-            // Make sure the bearing is positive
-            bearing_deg = fmod((bearing_deg + 360.0), 360.0);
-            // Make sure bearing is between -2pi and 2pi
-            if (bearing_rad < 0) {
-                bearing_rad += 2 * M_PI;
-            } else if (bearing_rad > 2 * M_PI) {
-                bearing_rad -= 2 * M_PI;
-            }
-            return std::make_pair(static_cast<float>(bearing_deg), static_cast<float>(bearing_rad));
         }
 
         void datum_gps_callback(const std::shared_ptr<farmbot_interfaces::srv::Datum::Request> _request, std::shared_ptr<farmbot_interfaces::srv::Datum::Response> _response) {
