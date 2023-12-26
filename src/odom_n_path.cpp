@@ -74,7 +74,7 @@ class OdomNPath : public rclcpp::Node {
             nav_msgs::msg::Odometry ecef_msg_ = *ecef_msg; // TODO: fix, this is a hack to get rid of unused variable warning
             enu_odom = *enu_msg;
             std::array<double, 4> quaterions = theta_to_quaternion(rad_msg->data);
-            RCLCPP_INFO(this->get_logger(), "quat: %.15f, %.15f, %.15f, %.15f", quaterions[0], quaterions[1], quaterions[2], quaterions[3]);
+            // RCLCPP_INFO(this->get_logger(), "quat: %.15f, %.15f, %.15f, %.15f", quaterions[0], quaterions[1], quaterions[2], quaterions[3]);
             enu_odom.pose.pose.orientation.w = quaterions[0];
             enu_odom.pose.pose.orientation.x = quaterions[1];
             enu_odom.pose.pose.orientation.y = quaterions[2];
@@ -83,8 +83,8 @@ class OdomNPath : public rclcpp::Node {
             geometry_msgs::msg::PoseStamped pose;
             pose.header = enu_odom.header;
             pose.header.frame_id = "map";
+            enu_odom.pose.pose.position.z = 0; // TODO: remove if you want to use altitude
             pose.pose = enu_odom.pose.pose;
-            pose.pose.position.z = 0; // TODO: remove if you want to use altitude
 
             //create path
             path.header.frame_id = "map";
