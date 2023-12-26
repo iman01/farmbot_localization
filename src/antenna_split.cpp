@@ -122,18 +122,28 @@ class AntennaSplit : public rclcpp::Node {
             RCLCPP_INFO(this->get_logger(), "LOCALIZATION WITH SINGLE ANTENNA MODE");
             RCLCPP_INFO(this->get_logger(), "-------------------------------------");
 
-            rclcpp::Parameter gps_topic = this->get_parameter("gps_topic");
-            RCLCPP_INFO(this->get_logger(), "GPS Topic: %s", gps_topic.as_string().c_str());
-            rclcpp::Parameter kallman_type_param = this->get_parameter("kallman_type");
-            kallman_type = kallman_type_param.as_int();
-            RCLCPP_INFO(this->get_logger(), "Kallman Type: %d", kallman_type);
+            
             rclcpp::Parameter topic_prefix_param = this->get_parameter("topic_prefix");
+            try{
+                rclcpp::Parameter gps_topic = this->get_parameter("gps_topic");
+                RCLCPP_INFO(this->get_logger(), "GPS Topic: %s", gps_topic.as_string().c_str());
+                gps_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(gps_topic.as_string(), 10, std::bind(&AntennaSplit::callback, this, std::placeholders::_1));
 
-            gps_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(gps_topic.as_string(), 10, std::bind(&AntennaSplit::callback, this, std::placeholders::_1));
-            rclcpp::Parameter gps_front_param = this->get_parameter("gps_front");
-            gps_front_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(gps_front_param.as_string(), 10);
-            rclcpp::Parameter gps_back_param = this->get_parameter("gps_back");
-            gps_back_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(gps_back_param.as_string(), 10);
+                rclcpp::Parameter gps_front_param = this->get_parameter("gps_front");
+                gps_front_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(gps_front_param.as_string(), 10);
+                rclcpp::Parameter gps_back_param = this->get_parameter("gps_back");
+                gps_back_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(gps_back_param.as_string(), 10);
+                
+                rclcpp::Parameter kallman_type_param = this->get_parameter("kallman_type");
+                RCLCPP_INFO(this->get_logger(), "Kallman Type: %d", kallman_type);
+                kallman_type = kallman_type_param.as_int();
+            } catch(const std::exception& e) {
+                RCLCPP_INFO(this->get_logger(), "Error: %s", e.what()); 
+                gps_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>("/fix", 10, std::bind(&AntennaSplit::callback, this, std::placeholders::_1));
+                gps_front_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(topic_prefix_param.as_string() + "/gps/front", 10);
+                gps_back_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(topic_prefix_param.as_string() + "/gps/back", 10);
+                kallman_type = 0;
+            }
 
             thresh_ser_ = this->create_service<farmbot_interfaces::srv::Threshold>(topic_prefix_param.as_string() + "/threshold", std::bind(&AntennaSplit::thresh_callback, this, std::placeholders::_1, std::placeholders::_2));
         }

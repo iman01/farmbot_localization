@@ -2,7 +2,6 @@ global:
   ros__parameters:
     topic_prefix: '/fb'
 
-
 antenna_split:
   ros__parameters:
     name: 'split'
