@@ -35,6 +35,7 @@ class OdomNPath : public rclcpp::Node {
         rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
         rclcpp::TimerBase::SharedPtr path_timer_;
         rclcpp::Service<farmbot_interfaces::srv::Trigger>::SharedPtr dist_reset;
+        rclcpp::Service<farmbot_interfaces::srv::Trigger>::SharedPtr path_reset;
 
         message_filters::Subscriber<nav_msgs::msg::Odometry> enu_sub_;
         message_filters::Subscriber<farmbot_interfaces::msg::Float32Stamped> rad_sub_;
@@ -60,6 +61,7 @@ class OdomNPath : public rclcpp::Node {
             dist_reset = this->create_service<farmbot_interfaces::srv::Trigger>(topic_prefix_param.as_string() + "/loc/dist_reset", std::bind(&OdomNPath::dist_reset_callback, this, std::placeholders::_1, std::placeholders::_2));
             path_pub_ = this->create_publisher<nav_msgs::msg::Path>(topic_prefix_param.as_string() + "/loc/path", 10);
             path_timer_ = this->create_wall_timer(std::chrono::milliseconds(100), std::bind(&OdomNPath::path_callback, this));
+            path_reset = this->create_service<farmbot_interfaces::srv::Trigger>(topic_prefix_param.as_string() + "/loc/path_reset", std::bind(&OdomNPath::path_reset_callback, this, std::placeholders::_1, std::placeholders::_2));
 
             enu_sub_.subscribe(this, topic_prefix_param.as_string() + "/loc/enu");
             rad_sub_.subscribe(this, topic_prefix_param.as_string() + "/loc/rad");
@@ -131,7 +133,12 @@ class OdomNPath : public rclcpp::Node {
             auto res = _response; // TODO: fix, this is a hack to get rid of unused variable warning
             return;
         }
-
+        void path_reset_callback(const std::shared_ptr<farmbot_interfaces::srv::Trigger::Request> _request, std::shared_ptr<farmbot_interfaces::srv::Trigger::Response> _response) {
+            path.poses.clear();
+            auto req = _request; // TODO: fix, this is a hack to get rid of unused variable warning
+            auto res = _response; // TODO: fix, this is a hack to get rid of unused variable warning
+            return;
+        }
 };
 
 int main(int argc, char *argv[]) {
