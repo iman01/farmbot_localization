@@ -70,10 +70,23 @@ class AntennaFuse : public rclcpp::Node {
             rclcpp::Parameter param_val = this->get_parameter("name"); 
             rclcpp::Parameter topic_prefix_param = this->get_parameter("topic_prefix");
 
-            rclcpp::Parameter gps_front_param = this->get_parameter("gps_front");
-            gps_front_.subscribe(this, gps_front_param.as_string());
-            rclcpp::Parameter gps_back_param = this->get_parameter("gps_back");
-            gps_back_.subscribe(this, gps_back_param.as_string());
+            // rclcpp::Parameter gps_front_param = this->get_parameter("gps_front");
+            // gps_front_.subscribe(this, gps_front_param.as_string());
+            // rclcpp::Parameter gps_back_param = this->get_parameter("gps_back");
+            // gps_back_.subscribe(this, gps_back_param.as_string());
+
+            try{
+                rclcpp::Parameter gps_front_param = this->get_parameter("gps_front");
+                gps_front_.subscribe(this, gps_front_param.as_string());
+                rclcpp::Parameter gps_back_param = this->get_parameter("gps_back");
+                gps_back_.subscribe(this, gps_back_param.as_string());
+            } catch(const std::exception& e) {
+                RCLCPP_INFO(this->get_logger(), "Error: %s", e.what());
+                gps_front_.subscribe(this, topic_prefix_param.as_string() + "/gps/front");
+                gps_back_.subscribe(this, topic_prefix_param.as_string() + "/gps/back");
+            }
+
+
             sync_ = std::make_shared<message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::NavSatFix, sensor_msgs::msg::NavSatFix>>>(10);
             sync_->connectInput(gps_front_, gps_back_);
             sync_->registerCallback(std::bind(&AntennaFuse::callback, this, std::placeholders::_1, std::placeholders::_2));
