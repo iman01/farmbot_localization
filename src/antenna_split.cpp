@@ -180,8 +180,13 @@ class AntennaSplit : public rclcpp::Node {
             } else if (kallman_type == 1) {
                 std::vector<double> measurement = {main_gps.latitude, main_gps.longitude};
                 std::vector<double> estimated_state = front_filter.step(measurement);
+                // temp_gps = main_gps;
                 main_gps.latitude = estimated_state[0];
                 main_gps.longitude = estimated_state[1];
+                // if (distance(temp_gps, main_gps) > threshold) {
+                //     positions[0] = positions[1];
+                //     positions[1] = main_gps;
+                // }
                 if (distance(main_gps, positions[0]) > threshold) {
                     std::vector<double> measurement = {positions[1].latitude, positions[1].longitude};
                     std::vector<double> estimated_state = back_filter.step(measurement);
