@@ -5,19 +5,20 @@ global:
 antenna_split:
   ros__parameters:
     name: 'split'
-    #input_topic: '/fix'
-    gps_topic: '/fix'
-    #output_topics: ['/gps/front', '/gps/back']
-    gps_front: '/gps/front'
-    gps_back: '/gps/back'
+    #input_topic:
+    gps_topic: '/gps'
+    #output_topics:
+    gps_main: '/gps_main'
+    gps_aux: '/gps_aux'
     kallman_type: 1
 
 antenna_fuse:
   ros__parameters:
     name: 'fuse'
-    #input_topics: ['/gps/front', '/gps/back']
-    gps_front: '/gps/front'
-    gps_back: '/gps/back'
+    #input_topics:
+    gps_main: '/gps_main'
+    gps_aux: '/gps_aux'
+    angle_gpses: 0.0
 
 gps_to_enu:
   ros__parameters:

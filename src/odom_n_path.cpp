@@ -50,7 +50,7 @@ class OdomNPath : public rclcpp::Node {
             .automatically_declare_parameters_from_overrides(true)
         ){
             RCLCPP_INFO(this->get_logger(), "Starting Odom&Path");
-
+            const char* ns = this->get_namespace();
             rclcpp::Parameter param_val = this->get_parameter("name"); 
             rclcpp::Parameter topic_prefix_param = this->get_parameter("topic_prefix");
 
